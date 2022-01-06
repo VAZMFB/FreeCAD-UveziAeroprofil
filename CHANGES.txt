@@ -1,0 +1,10 @@
+--------------------
+FreeCAD-UveziAeroprofil
+FreeCAD Makro za uvoz koordinata i modeliranje aeroprofila.
+--------------------
+
+Release 1.0.0, 06.01.2022.
+
+- Prvo izdanje
+
+--------------------

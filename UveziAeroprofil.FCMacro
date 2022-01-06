@@ -1,0 +1,312 @@
+# Makro za uvoz aeroprofila
+# Nakon izbora dokumenta sa koordiantama aeroprofila
+# se vrši obrada podataka i modeliranje aeroprofila.
+# Moguće je, korišćenjem jednostavnog dijaloga, skaliranje aeroprofila, 
+# rotacija, translacija u ravni, translacija duž razmaha, izbor ravni i 
+# glavne ose kao i pretvaranje geomerije u skicu. Omogućen je uvoz 
+# koordinata sačuvanih u najčešće korišćenim formatima.
+# Ucitavanje aeroprofila je zasnovano na:
+#  https://github.com/VAZMFB/Python-importAirfoil
+# Autor: Milos D. Petrasinovic <mpetrasinovic@mas.bg.ac.rs>
+# Proracun strukture letelica
+# Masinski fakultet, Univerzitet u Beogradu
+# Katedra za vazduhoplovstvo, Struktura letelica
+# https://vazmfb.com
+# Beograd, 2022
+# 
+# --------------------
+#
+# Copyright (C) 2022 Milos Petrasinovic <info@vazmfb.com>
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Lesser General Public License as 
+# published by the Free Software Foundation, either version 3 of the 
+# License, or (at your option) any later version.
+#  
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Lesser General Public License for more details.
+#  
+# You should have received a copy of the GNU Lesser General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+# --------------------
+#
+# Zasnovano na:
+# Airfoil Import and Scale 2.1.2
+# (c) quick61
+#
+# --------------------
+
+__Name__ = 'UveziAeroprofil'
+__Comment__ = 'Makro za učitavanje aeroprofila'
+__Author__ = 'Milos Petrasinovic <mpetrasinovic@mas.bg.ac.rs>'
+__Version__ = '1.0.0'
+__Date__ = '2022-01-06'
+__License__ = 'GPL-3.0-or-later'
+__Web__ = 'https://github.com/VAZMFB/FreeCAD-UveziAeroprofil'
+__Wiki__ = 'https://wiki.freecadweb.org/Macro_UveziAeroprofil'
+__Icon__ = 'UveziAeroprofil.svg'
+__Help__ = 'Pokrenite makro program i pratite uputstva!'
+__Status__ = 'stable'
+__Requires__ = 'Freecad >= 0.19'
+__Communication__ = 'https://github.com/VAZMFB/FreeCAD-UveziAeroprofil/issues/'
+__Files__ = 'UveziAeroprofil.svg'
+
+import FreeCAD as App
+from PySide import QtCore, QtGui
+from PySide.QtGui import QFileDialog, QLineEdit, QRadioButton, QMessageBox 
+import Draft, importAirfoilDAT
+import numpy as np
+import subprocess
+import sys
+import os
+import re
+   
+global filename
+global nameFile
+
+msgBox = QtGui.QMessageBox()
+msgBox.setWindowTitle("UveziAeroprofil")
+msgBox.setText("U sledećem prozoru izaberite dokument sa koordinatama aeroprofila.")
+msgBox.exec_()
+
+try:
+    filename, filefilter = QtGui.QFileDialog.getOpenFileName(QtGui.qApp.activeWindow(), 'Izaberite dokument sa koordinatama:', '*.dat;*.txt*.af')
+except Exception:
+    param = FreeCAD.ParamGet("User parameter:BaseApp/Preferences/Macro")
+    path = param.GetString("MacroPath", "") + "/"
+    filename, filefilter = QFileDialog.getOpenFileName(None, "Izaberite dokument sa koordinatama:", path, "*.dat;*.txt;*.af")
+
+nameFile = filename.split("/")[-1][:-4]
+
+class DrawAP():
+    def __init__(self):
+        self.dialog = None
+        self.lt = 0
+        self.alpha = 0
+        self.h0 = 0
+        self.plane = None
+        self.mirror = None
+        self.dh = 0
+        self.dv = 0
+        self.db = 0
+        self.sketch = None
+
+        # Dijalog prozor
+        self.dialog = QtGui.QDialog()
+        self.dialog.resize(350, 100)
+        self.dialog.setWindowTitle("UveziAeroprofil")
+        la = QtGui.QVBoxLayout(self.dialog)
+        tx = QtGui.QLabel("Dužina tetive [mm]:")
+        la.addWidget(tx)
+        self.lt = QtGui.QLineEdit("1000")
+        la.addWidget(self.lt)
+        tx = QtGui.QLabel("Ugao rotacije [deg]:")
+        la.addWidget(tx)
+        self.alpha = QtGui.QLineEdit("0")
+        la.addWidget(self.alpha)
+        tx = QtGui.QLabel("Položaj ose rotacije [% tetive]:")
+        la.addWidget(tx)
+        self.h0 = QtGui.QLineEdit("25")
+        la.addWidget(self.h0)
+        tx = QtGui.QLabel("Izbor ravni [XY = 1, YZ = 2, ZX = 3]:")
+        la.addWidget(tx)
+        self.plane = QtGui.QLineEdit("1")
+        la.addWidget(self.plane)
+        tx = QtGui.QLabel("Vertikalno preslikavanje [NE = 0, DA = 1]:")
+        la.addWidget(tx)
+        self.mirror = QtGui.QLineEdit("0")
+        la.addWidget(self.mirror)
+        tx = QtGui.QLabel("Izmena osa [NE = 0, DA = 1]:")
+        la.addWidget(tx)
+        self.flip = QtGui.QLineEdit("0")
+        la.addWidget(self.flip)
+        tx = QtGui.QLabel("Translacija po horizontalnoj osi [mm]:")
+        la.addWidget(tx)
+        self.dh = QtGui.QLineEdit("0")
+        la.addWidget(self.dh)
+        tx = QtGui.QLabel("Translacija po vertikalnoj osi [mm]:")
+        la.addWidget(tx)
+        self.dv = QtGui.QLineEdit("0")
+        la.addWidget(self.dv)
+        tx = QtGui.QLabel("Translacija duž razmaha [mm]:")
+        la.addWidget(tx)
+        self.db = QtGui.QLineEdit("0")
+        la.addWidget(self.db)
+        tx = QtGui.QLabel("Napraviti Sketch [NE = 0, DA = 1]:")
+        la.addWidget(tx)
+        self.sketch = QtGui.QLineEdit("0")
+        la.addWidget(self.sketch)
+
+        # Dodavanje OK i Cancel
+        okBox = QtGui.QDialogButtonBox(self.dialog)
+        okBox.setOrientation(QtCore.Qt.Horizontal)
+        okBox.setStandardButtons(QtGui.QDialogButtonBox.Cancel|QtGui.QDialogButtonBox.Ok)
+        la.addWidget(okBox)
+        QtCore.QObject.connect(okBox, QtCore.SIGNAL("accepted()"), self.proceed)
+        QtCore.QObject.connect(okBox, QtCore.SIGNAL("rejected()"), self.close)
+        QtCore.QMetaObject.connectSlotsByName(self.dialog)
+        self.dialog.show()
+        self.dialog.exec_()
+
+    def proceed(self):
+        global filename
+        global nameFile
+        try:
+            lt = float(self.lt.text())
+            alpha = float(self.alpha.text())
+            h0 = float(self.h0.text())
+            plane = float(self.plane.text())
+            mirror = float(self.mirror.text())
+            flip = float(self.flip.text())
+            dh = float(self.dh.text())
+            dv = float(self.dv.text())
+            db = float(self.db.text())
+            sketch = float(self.sketch.text())
+            af = importAirfoil(str(filename))
+            
+            # Otvaranje izlazne ivice
+            af[1][0] += 0.000001;
+            points = []
+            for i in range(len(af[0])):
+                point = App.Vector(af[0][i], af[1][i], 0)
+                points.append(point)
+            
+            Line1 = Draft.makeLine(points[0], points[-1])
+            Line1.Label = nameFile + "_(TEdge)"
+            BSpline1 = Draft.makeBSpline(points, closed=False)
+            BSpline1.Label = nameFile + "_(BSpline)"
+
+            # Grupisanje
+            Group1 = App.activeDocument().addObject('App::DocumentObjectGroup', 'Group')
+            Group1.Label = nameFile + "_(Group)"
+            Group1.addObject(Line1)
+            Group1.addObject(BSpline1)
+
+            App.activeDocument().recompute()
+
+            # Skaliranje
+            if App.Version()[1] < "19":
+                Draft.scale([Line1, BSpline1], App.Vector(lt, lt, lt), center=App.Vector(0.0, 0.0, 0.0), copy=False, legacy=True)
+            else:
+                Draft.scale([Line1, BSpline1], App.Vector(lt, lt, lt), center=App.Vector(0.0, 0.0, 0.0), copy=False)
+
+            # Rotacija 
+            Draft.rotate([Line1, BSpline1], -alpha, center=App.Vector(lt*h0/100, 0, 0), axis=App.Vector(0, 0, 1), copy=False)
+            
+            # Preslikavanje
+            if mirror == 1:
+                Draft.rotate([Line1, BSpline1], 180, center=App.Vector(0, 0, 0), axis=App.Vector(0, 1, 0), copy=False)
+            
+            # Translacija u ravni
+            Draft.move([Line1, BSpline1], App.Vector(dh, dv, 0.0), copy=False)
+                
+            # Promeni osu
+            Draft.rotate([Line1, BSpline1], -90, center=App.Vector(0, 0, 0), axis=App.Vector(0, 0, 1), copy=False)
+            
+            # Promeni ravan
+            if plane == 2: # YZ
+                Draft.rotate([Line1, BSpline1], 90, center=App.Vector(0, 0, 0), axis=App.Vector(0, 0, 1), copy=False)
+                Draft.rotate([Line1, BSpline1], 90, center=App.Vector(0, 0, 0), axis=App.Vector(0, 1, 0), copy=False)
+            elif plane == 3: # ZX
+                Draft.rotate([Line1, BSpline1], 90, center=App.Vector(0, 0, 0), axis=App.Vector(1, 0, 0), copy=False)
+                Draft.rotate([Line1, BSpline1], -90, center=App.Vector(0, 0, 0), axis=App.Vector(0, 1, 0), copy=False)
+
+            # Napravi skicu
+            if sketch == 1:
+                App.activeDocument().recompute()
+                Sketch1 = Draft.makeSketch([Line1, BSpline1], autoconstraints=True)
+                Sketch1.Label = nameFile + "_(Sketch)"
+
+            # Translacija duz razmaha
+            if plane == 2: # YZ
+                Draft.move([Line1, BSpline1], App.Vector(db, 0, 0), copy=False)
+                if sketch == 1:
+                    Draft.move(Sketch1, App.Vector(0, 0, db), copy=False)
+            elif plane == 3: # ZX
+                Draft.move([Line1, BSpline1], App.Vector(0, db, 0), copy=False)
+                if sketch == 1:
+                    Draft.move(Sketch1, App.Vector(0, 0, db), copy=False)
+            else:
+                Draft.move([Line1, BSpline1], App.Vector(0, 0, db), copy=False)
+                if sketch == 1:
+                    Draft.move(Sketch1, App.Vector(0, 0, db), copy=False)
+                    
+        except Exception as e:
+              exc_type, exc_obj, exc_tb = sys.exc_info()
+              App.Console.PrintError("Greška = "+str(e)+"\n")
+              App.Console.PrintError("    Greška na liniji = "+str(exc_tb.tb_lineno)+"\n")
+              msgBox = QtGui.QMessageBox()
+              msgBox.setWindowTitle("Greška")
+              msgBox.setText("Došlo je do greške, za više informacija videti Report prozor!")
+              msgBox.setWindowModality(QtCore.Qt.NonModal)
+              msgBox.show()
+
+        App.activeDocument().recompute()
+        Gui.SendMsgToActiveView("ViewFit")
+        self.close() # zatvori prozor
+        
+    def close(self):
+        self.dialog.hide() # zatvori prozor
+    
+def scanf(l):
+    # scanf('%f %f', l)
+    found = re.compile('([-+]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:[eE][-+]?\\d+)?)\\s+([-+]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:[eE][-+]?\\d+)?)').search(l)
+    casts = [float, float]
+    if found:
+        groups = found.groups()
+        return tuple([casts[i](groups[i]) for i in range(len(groups))])
+    
+def importAirfoil(file):
+    af = [];
+    if(os.path.isfile(file)):
+        with open(file) as f:
+            ls = [line.strip() for line in f]
+            
+        x = []
+        y = []
+        h = 1
+        for l in ls:
+            if l:
+                data = scanf(l);
+                if(h and data and len(data) == 2 and data[0] > -0.1
+                        and data[0] < 1.1 and data[1] > -1.1 
+                        and data[1] < 1.1):
+                    # Prva koordinata ukoliko postoje i x i y podaci
+                    # Opseg za x je [-0.1, 1.1] dok je za y [-1.1, 1.1]
+                    h = 0;
+                    x.append(data[0])
+                    y.append(data[1])
+                elif(not h and data and len(data) == 2):
+                    x.append(data[0])
+                    y.append(data[1])
+        
+        if(len(x) > 0):
+            if(any(xi >= 1.1 for xi in x)):
+                # Koordinate su verovatno pomnozene sa 100
+                x = np.divide(x, 100)
+                y = np.divide(y, 100)
+                      
+        d = np.diff(x)
+        if(sum([di < 0 for di in d]) == 1):
+            # Lednicer format
+            i = np.where(d < 0)[0][0]
+            x = [*np.flip(x[:i+1]).tolist(), *x[i+1:]]
+            y = [*np.flip(y[:i+1]).tolist(), *y[i+1:]]
+
+        af = np.array([x[1:-1], y[1:-1]])
+        _, idx = np.unique(af, axis=1, return_index=True)
+        af = [[x[0], *af[0][np.sort(idx)].tolist(), x[-1]],
+            [y[0], *af[1][np.sort(idx)].tolist(), y[-1]]]
+    return af
+    
+if os.path.isfile(filename):
+    DrawAP()
+else:
+    msgBox = QtGui.QMessageBox()
+    msgBox.setWindowTitle("Greška")
+    msgBox.setText("Nije izabran validan dokument sa koordinatama!")
+    msgBox.setWindowModality(QtCore.Qt.NonModal)
+    msgBox.show()
