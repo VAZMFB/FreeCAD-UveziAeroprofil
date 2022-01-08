@@ -35,7 +35,7 @@ Formira se otvoreni splajn (tip BSpline). Svaki aeroprofil se obrađuje tako da 
 Pokrenite makro program i pratite uputstva.
 
 ## Licenca
-Copyright (C) 2021 Miloš Petrašinović <info@vazmfb.com>
+Copyright (C) 2022 Miloš Petrašinović <info@vazmfb.com>
  
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as 
