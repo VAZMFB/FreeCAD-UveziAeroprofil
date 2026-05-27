@@ -1,7 +1,7 @@
 # FreeCAD UveziAeroprofil Makro ([FreeCAD-ImportAirfoil](https://github.com/VAZMFB/FreeCAD-ImportAirfoil) in Serbian)
 
 <p align="center">
-  <img src="https://vazmfb.com/web/img/github/UveziAeroprofil.svg" width="150">
+  <img src="https://milospetrasinovic.com/web/img/vazmfb-github/UveziAeroprofil.svg" width="150">
 </p>
 
 FreeCAD Makro za uvoz koordinata i modeliranje aeroprofila. Moguće je, korišćenjem jednostavnog dijaloga, skaliranje aeroprofila, rotacija, translacija u ravni, translacija duž razmaha, izbor ravni i glavne ose kao i pretvaranje geomerije u skicu. Omogućen je uvoz koordinata sačuvanih u najčešće korišćenim formatima.
@@ -9,7 +9,7 @@ FreeCAD Makro za uvoz koordinata i modeliranje aeroprofila. Moguće je, korišć
 Uvoz aeroprofila je baziran na: https://github.com/VAZMFB/Python-importAirfoil
 
 <p align="center">
-  <img src="https://vazmfb.com/web/img/github/UveziAeroprofil.png" width="800">
+  <img src="https://milospetrasinovic.com/web/img/vazmfb-github/UveziAeroprofil.png" width="800">
 </p>
 
 ## Zahtevi
@@ -35,7 +35,7 @@ Formira se otvoreni splajn (tip BSpline). Svaki aeroprofil se obrađuje tako da 
 Pokrenite makro program i pratite uputstva.
 
 ## Licenca
-Copyright (C) 2022 Miloš Petrašinović <info@vazmfb.com>
+Copyright (C) 2022 Miloš Petrašinović <mpetrasinovic@mas.bg.ac.rs>
  
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as 
